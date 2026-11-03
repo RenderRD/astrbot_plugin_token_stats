@@ -187,6 +187,8 @@ A：不会，插件只读，`provider_stats` 由 AstrBot 自己维护；删了�
 | 1.1.0 | 2026-11-03 | 时区可配（`timezone_offset`，默认 +8）；缺 `provider_stats` 表时给友好提示而不是报错 |
 | 1.0.0 | 2026-11-03 | 首个版本：今日/昨日/区间/按小时/按会话/历史，全部按北京时间日界 |
 
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 9. 开发者备注
 
 - 报表函数都是纯函数，签名统一为 `build_*_report(db: Path, ...) -> str`，方便单独测试：
