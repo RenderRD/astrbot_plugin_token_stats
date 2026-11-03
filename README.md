@@ -4,7 +4,7 @@
 
 - 插件名：`astrbot_plugin_token_stats`
 - 版本：`1.0.0`
-- 作者：冬冬
+- 作者：RenderRD
 - 适用：AstrBot `>= 4.17.0`（在 4.29.3 上实测）
 - 依赖：无额外依赖，只用 Python 标准库 `sqlite3`
 - 数据来源：AstrBot 自己的 `data_v4.db` → `provider_stats` 表，**只读**，不参与任何请求链路
