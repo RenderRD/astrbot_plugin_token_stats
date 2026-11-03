@@ -3,7 +3,7 @@ display_name: Token 账本
 desc: 按天 / 按小时 / 按会话查看 QQ AI 每天消耗了多少 token、缓存命中率多少（只读 provider_stats，不介入请求链路）
 version: 1.0.0
 author: 冬冬
-repo: ""
+repo: "https://github.com/RenderRD/astrbot_plugin_token_stats"
 astrbot_version: ">=4.17.0"
 tags:
   - token
