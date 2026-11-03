@@ -1,0 +1,10 @@
+{
+  "allowed_users": {
+    "description": "允许使用 /token 的 QQ 号；留空 = 所有人可用",
+    "type": "list",
+    "default": [],
+    "items": {
+      "type": "string"
+    }
+  }
+}

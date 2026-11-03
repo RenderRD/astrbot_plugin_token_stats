@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 运行时产物 / 本地配置（不要提交）
+config/
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.pem
+.env
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
