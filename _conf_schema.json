@@ -6,5 +6,10 @@
     "items": {
       "type": "string"
     }
+  },
+  "timezone_offset": {
+    "description": "日界时区偏移（小时）：8=北京时间，0=UTC，-5=美东，5.5=印度。只影响“今天/昨天”怎么切，不影响总量。",
+    "type": "float",
+    "default": 8
   }
 }

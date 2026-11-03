@@ -24,9 +24,11 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 PLUGIN_NAME = "astrbot_plugin_token_stats"
-PLUGIN_VERSION = "1.0.0"
+PLUGIN_VERSION = "1.1.0"
 
-TZ = timezone(timedelta(hours=8))  # 北京时间
+# 日界时区偏移（小时），默认北京时间 +8；可由配置 timezone_offset 覆盖
+TZ_OFFSET = 8.0
+
 USAGE = (
     "用法：\n"
     "/token            今天\n"
@@ -37,6 +39,10 @@ USAGE = (
     "/token 会话       今天按会话\n"
     "/token 全部       历史每天"
 )
+
+
+def _tz() -> timezone:
+    return timezone(timedelta(hours=TZ_OFFSET))
 
 
 def _db_path() -> Path:
@@ -57,6 +63,19 @@ def _db_path() -> Path:
     return Path("/AstrBot/data/data_v4.db")
 
 
+def _has_table(db: Path) -> bool:
+    con = sqlite3.connect("file:%s?mode=ro" % db, uri=True, timeout=5)
+    try:
+        row = con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='provider_stats'"
+        ).fetchone()
+        return bool(row)
+    except Exception:
+        return False
+    finally:
+        con.close()
+
+
 def _query(db: Path, start_utc: str, end_utc: str):
     con = sqlite3.connect("file:%s?mode=ro" % db, uri=True, timeout=5)
     try:
@@ -75,8 +94,9 @@ def _query(db: Path, start_utc: str, end_utc: str):
 
 def _bounds(day_offset: int):
     """本地某一天 → UTC 起止字符串（数据库里存的是 UTC）。"""
-    now = datetime.now(TZ)
-    start_local = datetime(now.year, now.month, now.day, tzinfo=TZ) - timedelta(
+    tz = _tz()
+    now = datetime.now(tz)
+    start_local = datetime(now.year, now.month, now.day, tzinfo=tz) - timedelta(
         days=day_offset
     )
     end_local = start_local + timedelta(days=1)
@@ -89,12 +109,12 @@ def _bounds(day_offset: int):
 
 
 def _local_dt(ts) -> datetime:
-    """库里是 UTC naive 时间，转成北京时间。"""
+    """库里是 UTC naive 时间，转成配置的本地时区。"""
     try:
         d = datetime.strptime(str(ts)[:19], "%Y-%m-%d %H:%M:%S")
-        return d.replace(tzinfo=timezone.utc).astimezone(TZ)
+        return d.replace(tzinfo=timezone.utc).astimezone(_tz())
     except Exception:
-        return datetime.now(TZ)
+        return datetime.now(_tz())
 
 
 def _num(n: int) -> str:
@@ -142,9 +162,10 @@ def build_day_report(db: Path, day_offset: int, title_suffix: str = "") -> str:
         "└ 输出 %s" % _num(out),
         "── 本月对照 ──",
     ]
-    # 本月合计（当月 1 号 → 今天结束）
-    now = datetime.now(TZ)
-    month_start = datetime(now.year, now.month, 1, tzinfo=TZ)
+    # 本月合计（当月 1 号 → 下月 1 号）
+    tz = _tz()
+    now = datetime.now(tz)
+    month_start = datetime(now.year, now.month, 1, tzinfo=tz)
     m_start = month_start.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     m_end = (month_start + timedelta(days=32)).replace(day=1)
     m_end_utc = m_end.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -250,7 +271,7 @@ def build_all_report(db: Path) -> str:
         b[1] += int(cached or 0)
         b[2] += int(out or 0)
         b[3] += 1
-    lines = ["📊 历史每天（北京时间日界）"]
+    lines = ["📊 历史每天（本地日界）"]
     tot = 0
     for day in sorted(buckets):
         miss, cached, out, calls = buckets[day]
@@ -276,6 +297,13 @@ class TokenStatsPlugin(Star):
         self.conf = config or {}
         allowed = self.conf.get("allowed_users") or []
         self.allowed = {str(x) for x in allowed if str(x).strip()}
+        # 时区偏移（小时），支持 8 / -5 / 5.5 这类写法
+        global TZ_OFFSET
+        try:
+            off = float(self.conf.get("timezone_offset", 8))
+            TZ_OFFSET = off
+        except (TypeError, ValueError):
+            TZ_OFFSET = 8.0
 
     def _db(self) -> Path:
         return _db_path()
@@ -283,7 +311,8 @@ class TokenStatsPlugin(Star):
     def _denied(self, event: AstrMessageEvent) -> bool:
         if not self.allowed:
             return False
-        sender = str(getattr(event, "get_sender_id", lambda: "")() or "")
+        getter = getattr(event, "get_sender_id", None)
+        sender = str(getter() or "") if callable(getter) else ""
         return sender not in self.allowed
 
     @filter.command("token")
@@ -296,6 +325,12 @@ class TokenStatsPlugin(Star):
         db = self._db()
         if not db.exists():
             yield event.plain_result("找不到 AstrBot 数据库：%s" % db)
+            return
+        if not _has_table(db):
+            yield event.plain_result(
+                "这个 AstrBot 版本没有 provider_stats 表，统计不到用量。\n"
+                "（该表由 AstrBot 核心维护，较新版本才有；建议升级到 4.29 以上）"
+            )
             return
         try:
             if not arg:
